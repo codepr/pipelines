@@ -20,13 +20,17 @@ type VisitEventAggregator struct {
 	source      EventSource
 }
 
+// unmarshalEvents apply decoding to every bytestring received from the
+// upstream `VisitEventAggregator.source.Run()` call. This step can
+// affectively scale the number of worker goroutines according to the
+// `concurrency` value set
 func (v *VisitEventAggregator) unmarshalEvents(ctx context.Context, lines <-chan []byte) (<-chan Event, <-chan error) {
 	out := make(chan Event)
 	errc := make(chan error)
 	go func() {
 		var (
 			wg  sync.WaitGroup
-			sem = make(chan struct{}, 64)
+			sem = make(chan struct{}, v.concurrency)
 		)
 		for line := range lines {
 			sem <- struct{}{}
@@ -43,7 +47,7 @@ func (v *VisitEventAggregator) unmarshalEvents(ctx context.Context, lines <-chan
 				var event Event
 				err := json.Unmarshal(line, &event)
 				if err != nil {
-					errc <- errors.Errorf("empty line")
+					errc <- err
 					return
 				}
 				select {
@@ -348,6 +352,7 @@ func (v *VisitEventAggregator) foldSummaries(ctx context.Context, events <-chan 
 							select {
 							case out <- doc:
 							case <-ctx.Done():
+								return
 							}
 						}
 					}
@@ -398,7 +403,7 @@ func (v *VisitEventAggregator) Summarize(ctx context.Context) (<-chan PageSummar
 				out <- record
 			case err, ok := <-errch:
 				if !ok {
-					return
+					continue
 				}
 				errc <- err
 			case <-ctx.Done():

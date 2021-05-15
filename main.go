@@ -3,35 +3,11 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"time"
 )
-
-func (e *Event) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &e.Type); err != nil {
-		return err
-	}
-	switch e.Type.EventType {
-	case Create:
-		e.CreateEvent = &CreateEvent{}
-		err := json.Unmarshal(data, &e.CreateEvent)
-		if err != nil {
-			return err
-		}
-	case Update:
-		e.UpdateEvent = &UpdateEvent{}
-		err := json.Unmarshal(data, &e.UpdateEvent)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unrecognized type value %q", e.Type.EventType)
-	}
-	return nil
-}
 
 type FileEventSource struct {
 	filename string
